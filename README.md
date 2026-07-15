@@ -141,14 +141,3 @@ Reactive Orgs that either do not have Policies, Processes and Procedures or ones
 🎨 [DNS Resolver - Google](https://mr-r3b00t.github.io/soc_chef/tools/dns_resolver.html)
 
 
-☕ [Buy me a coffee](https://buymeacoffee.com/mrr3b00t)  
-
-
-<img width="700" height="700" alt="image" src="https://github.com/user-attachments/assets/acf2f632-5a16-43c2-9908-e259b15677ac" />  
-
-
-
-Copyright (c) Xservus Limited
-Created by mRr3b00t
-
-Version 0.27 - Experimental - Use at own risk
