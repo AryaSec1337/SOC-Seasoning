@@ -1,0 +1,651 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CAF Assessment Tool</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+        }
+        h1, h2, h3, h4 {
+            color: #2c3e50;
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        details {
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #fff;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        summary {
+            cursor: pointer;
+            font-weight: bold;
+            padding: 10px;
+            background-color: #ecf0f1;
+            border-radius: 5px;
+        }
+        summary:hover {
+            background-color: #dfe6e9;
+        }
+        ul {
+            list-style-type: disc;
+            padding-left: 25px;
+            margin: 10px 0;
+        }
+        .radio-group, .difficulty-group {
+            margin-top: 10px;
+        }
+        label {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+            padding: 5px;
+            border-radius: 3px;
+        }
+        label input {
+            margin-right: 10px;
+        }
+        #action-log, #responses {
+            margin-top: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        #log-list li, #response-list li {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 5px;
+        }
+        #response-list li {
+            border: 1px solid #eee;
+        }
+        .not-achieved { color: red; }
+        .partially-achieved { color: orange; }
+        .achieved { color: green; }
+        #file-input-container {
+            margin: 20px auto;
+            text-align: center;
+        }
+        #file-input {
+            margin-top: 10px;
+        }
+        #generate-report, #clear-data {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #2c3e50;
+            color: #fff;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        #generate-report:hover, #clear-data:hover {
+            background-color: #34495e;
+        }
+        .instruction {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .error-message {
+            color: red;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        #metadata-form {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #ddd;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            justify-content: center;
+        }
+        #metadata-form label {
+            display: block;
+            margin-bottom: basin5px;
+            font-weight: bold;
+        }
+        #metadata-form input, #metadata-form select {
+            width: 200px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .notes-input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-top: 10px;
+        }
+        .disabled-section {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cyber Assessment Framework (CAF) Assessment Tool</h1>
+    <p class="instruction">Enter assessment details below, then review subsections. Each subsection displays Indicators of Good Practice (IGPs) to guide compliance level selection. Responses are shown below with aligned IGPs, notes, and difficulty.</p>
+    <div id="metadata-form">
+        <div>
+            <label for="assessor-name">Name:</label>
+            <input type="text" id="assessor-name" name="assessor-name">
+        </div>
+        <div>
+            <label for="assessment-date">Date:</label>
+            <input type="date" id="assessment-date" name="assessment-date">
+        </div>
+        <div>
+            <label for="status">Status:</label>
+            <select id="status" name="status">
+                <option value="">Select Status</option>
+                <option value="Draft">Draft</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Completed">Completed</option>
+            </select>
+        </div>
+        <div>
+            <label for="organisation-name">Organisation Name:</label>
+            <input type="text" id="organisation-name" name="organisation-name">
+        </div>
+    </div>
+    <div id="file-input-container" style="display: none;">
+        <p class="error-message">Failed to load CAF data from URL. Please upload the CAF data file to begin the assessment.</p>
+        <input type="file" id="file-input" accept=".html">
+    </div>
+    <div id="caf-content">
+        <p>Loading CAF data...</p>
+    </div>
+    <div id="action-log">
+        <h3>Action Log</h3>
+        <ul id="log-list"></ul>
+    </div>
+    <div id="responses">
+        <h3>Responses</h3>
+        <ul id="response-list"></ul>
+        <button id="generate-report">Generate Report</button>
+        <button id="clear-data">Clear Data</button>
+    </div>
+    <script>
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+            if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+                try {
+                    var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                    var firstSheetName = workbook.SheetNames[0];
+                    var worksheet = workbook.Sheets[firstSheetName];
+                    var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                    var filteredData = jsonData.filter(row =>
+                        row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                    );
+                    var csv = XLSX.utils.aoa_to_sheet(filteredData);
+                    csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                    return csv;
+                } catch (e) {
+                    console.error(e);
+                    return "";
+                }
+            }
+            return gk_fileData[filename] || "";
+        }
+
+        let cafData = [];
+        const CAF_URL = 'https://mr-r3b00t.github.io/soc_chef/resources/caf_3_2.html';
+
+        function parseIGPs(cell) {
+            const igps = { notAchieved: [], partiallyAchieved: [], achieved: [] };
+            const ul = cell.querySelector('ul');
+            if (ul) {
+                const lis = ul.querySelectorAll('li');
+                lis.forEach(li => {
+                    const strong = li.querySelector('strong');
+                    if (strong) {
+                        let categoryText = strong.textContent.trim().toLowerCase().replace(/:/g, '');
+                        let category;
+                        if (categoryText.includes('not achieved')) {
+                            category = 'notAchieved';
+                        } else if (categoryText.includes('partially achieved')) {
+                            category = 'partiallyAchieved';
+                        } else if (categoryText.includes('achieved')) {
+                            category = 'achieved';
+                        }
+                        if (category) {
+                            const description = li.textContent.replace(strong.textContent, '').trim();
+                            if (description) {
+                                igps[category].push(description);
+                            }
+                        }
+                    }
+                });
+            }
+            return igps;
+        }
+
+        function parseTable(table) {
+            const rows = table.querySelectorAll('tbody tr');
+            let currentObjective = null;
+            let currentPrinciple = null;
+            const cafData = [];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length >= 3) {
+                    const objectiveText = cells[0].textContent.trim();
+                    const subsectionText = cells[1].textContent.trim();
+                    if (objectiveText && subsectionText === '-') {
+                        currentObjective = objectiveText;
+                    } else if (!objectiveText && subsectionText.startsWith('Principle')) {
+                        currentPrinciple = subsectionText;
+                    } else if (!objectiveText && subsectionText && cells[2].querySelector('ul')) {
+                        const parts = subsectionText.split(' ');
+                        const code = parts[0];
+                        const subsectionName = parts.slice(1).join(' ');
+                        const igps = parseIGPs(cells[2]);
+                        const data = {
+                            code,
+                            objective: currentObjective,
+                            principle: currentPrinciple,
+                            subsection: subsectionName,
+                            igps
+                        };
+                        cafData.push(data);
+                    }
+                }
+            });
+            return cafData;
+        }
+
+        function generateAssessmentSections(cafData) {
+            const contentDiv = document.getElementById('caf-content');
+            contentDiv.innerHTML = '';
+            const objectives = [...new Set(cafData.map(item => item.objective))];
+            objectives.forEach(objective => {
+                const h2 = document.createElement('h2');
+                h2.textContent = objective;
+                contentDiv.appendChild(h2);
+                const principles = [...new Set(cafData.filter(item => item.objective === objective).map(item => item.principle))];
+                principles.forEach(principle => {
+                    const h3 = document.createElement('h3');
+                    h3.textContent = principle;
+                    contentDiv.appendChild(h3);
+                    const subsections = cafData.filter(item => item.principle === principle);
+                    subsections.forEach(subsection => {
+                        const details = document.createElement('details');
+                        const summary = document.createElement('summary');
+                        summary.textContent = `${subsection.code} - ${subsection.subsection}`;
+                        details.appendChild(summary);
+                        const note = document.createElement('p');
+                        note.textContent = 'Review the following IGPs to assess the compliance level for this subsection:';
+                        details.appendChild(note);
+                        ['notAchieved', 'partiallyAchieved', 'achieved'].forEach(category => {
+                            if (subsection.igps[category] && subsection.igps[category].length > 0) {
+                                const p = document.createElement('p');
+                                p.innerHTML = `<strong>${category.replace(/([A-Z])/g, ' $1').trim()}:</strong>`;
+                                details.appendChild(p);
+                                const ul = document.createElement('ul');
+                                subsection.igps[category].forEach(igp => {
+                                    const li = document.createElement('li');
+                                    li.textContent = igp;
+                                    ul.appendChild(li);
+                                });
+                                details.appendChild(ul);
+                            }
+                        });
+                        const radioGroup = document.createElement('div');
+                        radioGroup.className = 'radio-group';
+                        ['Not Achieved', 'Partially Achieved', 'Achieved'].forEach(option => {
+                            const label = document.createElement('label');
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = `compliance-${subsection.code}`;
+                            input.value = option;
+                            input.addEventListener('change', () => updateDifficultySection(subsection.code));
+                            label.appendChild(input);
+                            label.appendChild(document.createTextNode(option));
+                            radioGroup.appendChild(label);
+                        });
+                        details.appendChild(radioGroup);
+                        const notesLabel = document.createElement('label');
+                        notesLabel.textContent = 'Notes:';
+                        notesLabel.htmlFor = `notes-${subsection.code}`;
+                        details.appendChild(notesLabel);
+                        const notesInput = document.createElement('textarea');
+                        notesInput.className = 'notes-input';
+                        notesInput.id = `notes-${subsection.code}`;
+                        notesInput.rows = 4;
+                        details.appendChild(notesInput);
+                        const difficultyLabel = document.createElement('label');
+                        difficultyLabel.textContent = 'Difficulty to Fix:';
+                        details.appendChild(difficultyLabel);
+                        const difficultyGroup = document.createElement('div');
+                        difficultyGroup.className = 'difficulty-group';
+                        difficultyGroup.id = `difficulty-group-${subsection.code}`;
+                        ['Very Easy', 'Easy', 'Moderate', 'Hard', 'Very Hard', 'Not Applicable'].forEach(option => {
+                            const label = document.createElement('label');
+                            const input = document.createElement('input');
+                            input.type = 'radio';
+                            input.name = `difficulty-${subsection.code}`;
+                            input.value = option;
+                            label.appendChild(input);
+                            label.appendChild(document.createTextNode(option));
+                            difficultyGroup.appendChild(label);
+                        });
+                        details.appendChild(difficultyGroup);
+                        contentDiv.appendChild(details);
+                    });
+                });
+            });
+            updateResponsesSection();
+            cafData.forEach(subsection => updateDifficultySection(subsection.code));
+        }
+
+        function updateDifficultySection(code) {
+            const complianceName = `compliance-${code}`;
+            const difficultyGroup = document.getElementById(`difficulty-group-${code}`);
+            const compliance = localStorage.getItem(complianceName);
+            if (compliance === 'Achieved') {
+                difficultyGroup.classList.add('disabled-section');
+                localStorage.setItem(`difficulty-${code}`, 'Not Required');
+                const radios = difficultyGroup.querySelectorAll('input[type="radio"]');
+                radios.forEach(radio => radio.checked = false);
+            } else {
+                difficultyGroup.classList.remove('disabled-section');
+                const savedDifficulty = localStorage.getItem(`difficulty-${code}`);
+                if (savedDifficulty === 'Not Required') {
+                    localStorage.removeItem(`difficulty-${code}`);
+                }
+            }
+            updateResponsesSection();
+        }
+
+        function initializeFromStorage(cafData) {
+            const logList = document.getElementById('log-list');
+            logList.innerHTML = '';
+            cafData.forEach(subsection => {
+                const complianceName = `compliance-${subsection.code}`;
+                const notesName = `notes-${subsection.code}`;
+                const difficultyName = `difficulty-${subsection.code}`;
+                const savedCompliance = localStorage.getItem(complianceName);
+                const savedNotes = localStorage.getItem(notesName);
+                const savedDifficulty = localStorage.getItem(difficultyName);
+                if (savedCompliance) {
+                    const radio = document.querySelector(`input[name="${complianceName}"][value="${savedCompliance}"]`);
+                    if (radio) radio.checked = true;
+                    const li = document.createElement('li');
+                    li.textContent = `${subsection.code}: ${savedCompliance}`;
+                    li.className = getClass(savedCompliance);
+                    li.dataset.name = complianceName;
+                    logList.appendChild(li);
+                }
+                if (savedNotes) {
+                    const notesInput = document.getElementById(notesName);
+                    if (notesInput) notesInput.value = savedNotes;
+                }
+                if (savedDifficulty) {
+                    const radio = document.querySelector(`input[name="${difficultyName}"][value="${savedDifficulty}"]`);
+                    if (radio && savedDifficulty !== 'Not Required') radio.checked = true;
+                }
+            });
+            const metadata = ['assessor-name', 'assessment-date', 'status', 'organisation-name'];
+            metadata.forEach(field => {
+                const savedValue = localStorage.getItem(field);
+                if (savedValue) {
+                    const input = document.getElementById(field);
+                    if (input) input.value = savedValue;
+                }
+            });
+            cafData.forEach(subsection => updateDifficultySection(subsection.code));
+            updateResponsesSection();
+        }
+
+        function getClass(value) {
+            switch (value) {
+                case 'Not Achieved': return 'not-achieved';
+                case 'Partially Achieved': return 'partially-achieved';
+                case 'Achieved': return 'achieved';
+                default: return '';
+            }
+        }
+
+        function updateResponsesSection() {
+            const responseList = document.getElementById('response-list');
+            responseList.innerHTML = '';
+            cafData.forEach(subsection => {
+                const complianceName = `compliance-${subsection.code}`;
+                const notesName = `notes-${subsection.code}`;
+                const difficultyName = `difficulty-${subsection.code}`;
+                const compliance = localStorage.getItem(complianceName) || 'No response';
+                const notes = localStorage.getItem(notesName) || '';
+                const difficulty = localStorage.getItem(difficultyName) || 'Not provided';
+                if (compliance !== 'No response') {
+                    const li = document.createElement('li');
+                    li.className = getClass(compliance);
+                    let igps = [];
+                    if (compliance === 'Not Achieved') {
+                        igps = subsection.igps.notAchieved;
+                    } else if (compliance === 'Partially Achieved') {
+                        igps = subsection.igps.partiallyAchieved;
+                    } else if (compliance === 'Achieved') {
+                        igps = subsection.igps.achieved;
+                    }
+                    let igpHTML = '<ul>';
+                    igps.forEach(igp => {
+                        igpHTML += `<li>${igp}</li>`;
+                    });
+                    igpHTML += '</ul>';
+                    li.innerHTML = `
+                        <strong>${subsection.code} - ${subsection.subsection}</strong><br>
+                        <strong>Compliance:</strong> ${compliance}<br>
+                        <strong>Aligned IGPs:</strong> ${igps.length > 0 ? igpHTML : 'None'}<br>
+                        <strong>Notes:</strong> ${notes ? notes.replace(/\n/g, '<br>') : 'None'}<br>
+                        <strong>Difficulty to Fix:</strong> ${difficulty}
+                    `;
+                    responseList.appendChild(li);
+                }
+            });
+        }
+
+        function showFileUpload() {
+            const fileInputContainer = document.getElementById('file-input-container');
+            fileInputContainer.style.display = 'block';
+            const contentDiv = document.getElementById('caf-content');
+            contentDiv.innerHTML = '<p>Please upload the CAF data file to begin the assessment.</p>';
+        }
+
+        function processHTML(htmlContent) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(htmlContent, 'text/html');
+            const table = doc.querySelector('table');
+            if (table) {
+                cafData = parseTable(table);
+                generateAssessmentSections(cafData);
+                initializeFromStorage(cafData);
+            } else {
+                showFileUpload();
+            }
+        }
+
+        function clearAllData() {
+            if (confirm('Are you sure you want to clear all assessment data? This action cannot be undone.')) {
+                localStorage.clear();
+                const metadataForm = document.getElementById('metadata-form');
+                metadataForm.querySelectorAll('input, select').forEach(input => {
+                    input.value = input.type === 'select-one' ? '' : '';
+                });
+                document.querySelectorAll('input[type="radio"]').forEach(radio => {
+                    radio.checked = false;
+                });
+                document.querySelectorAll('textarea.notes-input').forEach(textarea => {
+                    textarea.value = '';
+                });
+                document.getElementById('log-list').innerHTML = '';
+                document.getElementById('response-list').innerHTML = '';
+                cafData.forEach(subsection => {
+                    const difficultyGroup = document.getElementById(`difficulty-group-${subsection.code}`);
+                    if (difficultyGroup) {
+                        difficultyGroup.classList.remove('disabled-section');
+                    }
+                });
+                alert('All data has been cleared.');
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch(CAF_URL)
+                .then(response => {
+                    if (!response.ok) throw new Error('Network response was not ok');
+                    return response.text();
+                })
+                .then(htmlContent => {
+                    processHTML(htmlContent);
+                })
+                .catch(error => {
+                    console.error('Error fetching CAF data:', error);
+                    showFileUpload();
+                });
+        });
+
+        document.getElementById('file-input').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    processHTML(e.target.result);
+                };
+                reader.readAsText(file);
+            }
+        });
+
+        document.addEventListener('change', function(event) {
+            if (event.target.type === 'radio' || event.target.type === 'textarea' || event.target.type === 'text' || event.target.type === 'date' || event.target.tagName === 'SELECT') {
+                const name = event.target.name || event.target.id;
+                const value = event.target.value;
+                if (name) {
+                    localStorage.setItem(name, value);
+                    if (event.target.type === 'radio' && name.startsWith('compliance-')) {
+                        const code = name.replace('compliance-', '');
+                        const logList = document.getElementById('log-list');
+                        const existingEntry = document.querySelector(`#log-list li[data-name="${name}"]`);
+                        if (existingEntry) existingEntry.remove();
+                        const li = document.createElement('li');
+                        li.textContent = `${code}: ${value}`;
+                        li.className = getClass(value);
+                        li.dataset.name = name;
+                        logList.appendChild(li);
+                        updateDifficultySection(code);
+                    }
+                    updateResponsesSection();
+                }
+            }
+        });
+
+        document.getElementById('generate-report').addEventListener('click', generateReport);
+        document.getElementById('clear-data').addEventListener('click', clearAllData);
+
+        function generateReport() {
+            const metadata = {
+                'Assessor Name': localStorage.getItem('assessor-name') || 'Not provided',
+                'Assessment Date': localStorage.getItem('assessment-date') || 'Not provided',
+                'Status': localStorage.getItem('status') || 'Not provided',
+                'Organisation Name': localStorage.getItem('organisation-name') || 'Not provided'
+            };
+            const data = cafData.map(subsection => {
+                const code = subsection.code;
+                const compliance = localStorage.getItem(`compliance-${code}`) || 'No response';
+                const notes = localStorage.getItem(`notes-${code}`) || '';
+                const difficulty = localStorage.getItem(`difficulty-${code}`) || 'Not provided';
+                let igps = [];
+                if (compliance === 'Not Achieved') {
+                    igps = subsection.igps.notAchieved;
+                } else if (compliance === 'Partially Achieved') {
+                    igps = subsection.igps.partiallyAchieved;
+                } else if (compliance === 'Achieved') {
+                    igps = subsection.igps.achieved;
+                }
+                return {
+                    objective: subsection.objective,
+                    principle: subsection.principle,
+                    code: subsection.code,
+                    subsection: subsection.subsection,
+                    compliance,
+                    igps,
+                    notes,
+                    difficulty
+                };
+            });
+            data.sort((a, b) => a.code.localeCompare(b.code));
+            let reportHTML = '<html><head><title>CAF Assessment Report</title>';
+            reportHTML += '<style>body { font-family: Arial, sans-serif; margin: 20px; } table { width: 100%; border-collapse: collapse; margin-top: 20px; } th, td { border: 1px solid #ddd; padding: 8px; text-align: left; } th { background-color: #f2f2f2; } h1 { color: #2c3e50; text-align: center; } p { text-align: center; } .metadata { margin-bottom: 20px; } .metadata p { text-align: left; margin: 5px 0; } ul { padding-left: 20px; }</style>';
+            reportHTML += '</head><body>';
+            reportHTML += '<h1>CAF Assessment Report</h1>';
+            reportHTML += `<p>Report generated on: ${new Date().toLocaleString()}</p>`;
+            reportHTML += '<div class="metadata">';
+            reportHTML += `<p><strong>Assessor Name:</strong> ${metadata['Assessor Name']}</p>`;
+            reportHTML += `<p><strong>Assessment Date:</strong> ${metadata['Assessment Date']}</p>`;
+            reportHTML += `<p><strong>Status:</strong> ${metadata['Status']}</p>`;
+            reportHTML += `<p><strong>Organisation Name:</strong> ${metadata['Organisation Name']}</p>`;
+            reportHTML += '</div>';
+            reportHTML += '<table><thead><tr><th>Objective</th><th>Principle</th><th>Subsection</th><th>Compliance</th><th>Aligned IGPs</th><th>Notes</th><th>Difficulty to Fix</th></tr></thead><tbody>';
+            data.forEach(item => {
+                let igpHTML = '<ul>';
+                item.igps.forEach(igp => {
+                    igpHTML += `<li>${igp}</li>`;
+                });
+                igpHTML += '</ul>';
+                reportHTML += `<tr><td>${item.objective}</td><td>${item.principle}</td><td>${item.code} - ${item.subsection}</td><td>${item.compliance}</td><td>${item.igps.length > 0 ? igpHTML : 'None'}</td><td>${item.notes.replace(/\n/g, '<br>')}</td><td>${item.difficulty}</td></tr>`;
+            });
+            reportHTML += '</tbody></table>';
+            reportHTML += '</body></html>';
+            const reportWindow = window.open('', '_blank');
+            reportWindow.document.write(reportHTML);
+            reportWindow.document.close();
+        }
+    </script>
+</body>
+</html>

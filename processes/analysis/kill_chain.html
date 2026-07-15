@@ -1,0 +1,805 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row =>
+                    row.some(cell => cell !== '' && cell !== null && cell !== undefined)
+                );
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyber Kill Chain Analysis Application</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            margin: 40px;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            color: #333;
+        }
+        h1 {
+            font-size: 2.2em;
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        h2 {
+            font-size: 1.8em;
+            color: #34495e;
+            margin-top: 30px;
+            border-bottom: 2px solid #ecf0f1;
+            padding-bottom: 5px;
+        }
+        h3 {
+            font-size: 1.4em;
+            color: #3c5a76;
+            margin-top: 20px;
+        }
+        p {
+            margin: 10px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        #user-info-section, #log-section {
+            padding: 20px;
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: inline-block;
+            width: 150px;
+            font-weight: bold;
+        }
+        .input-group input, .input-group textarea, .input-group select {
+            padding: 5px;
+            width: 300px;
+            border: 1px solid #ddd;
+            border-radius: 3px;
+            vertical-align: top;
+        }
+        .input-group textarea {
+            height: 60px;
+            resize: vertical;
+        }
+        #kill-chain-diagram {
+            margin: 20px 0;
+            text-align: center;
+        }
+        #kill-chain-diagram svg {
+            max-width: 100%;
+            height: auto;
+        }
+        #kill-chain-table-section {
+            margin-top: 20px;
+        }
+        #kill-chain-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        #kill-chain-table th, #kill-chain-table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            font-size: 0.9em;
+        }
+        #kill-chain-table th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        #kill-chain-table tr:nth-child(even) {
+            background-color: #f9f9f9;
+        }
+        #kill-chain-table .delete-button {
+            padding: 5px 10px;
+            background-color: #e74c3c;
+            color: white;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.8em;
+        }
+        #kill-chain-table .delete-button:hover {
+            background-color: #c0392b;
+        }
+        #timeline-error {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 5px;
+            display: none;
+        }
+        .button-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #3498db;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #clear-state-button {
+            background-color: #e74c3c;
+        }
+        #clear-state-button:hover {
+            background-color: #c0392b;
+        }
+        #jump-to-log {
+            display: block;
+            margin: 20px auto;
+            text-align: center;
+        }
+        .copy-button {
+            padding: 5px 10px;
+            font-size: 0.9em;
+            margin-left: 10px;
+        }
+        .copy-button.copied {
+            background-color: #2ecc71;
+        }
+        .copy-button.copied:hover {
+            background-color: #27ae60;
+        }
+        .email-template {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.9em;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            margin: 10px 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            font-size: 0.9em;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <h1>Cyber Kill Chain Analysis Application</h1>
+    <button id="jump-to-log">Jump to Action Log</button>
+
+    <div id="user-info-section">
+        <h2>User Information</h2>
+        <div class="input-group">
+            <label for="user-name">Name:</label>
+            <input type="text" id="user-name" placeholder="Enter your name">
+        </div>
+        <div class="input-group">
+            <label for="user-title">Title:</label>
+            <input type="text" id="user-title" placeholder="Enter your title">
+        </div>
+        <div class="input-group">
+            <label for="user-role">Role:</label>
+            <input type="text" id="user-role" placeholder="Enter your role">
+        </div>
+        <div class="input-group">
+            <label for="user-org">Organisation:</label>
+            <input type="text" id="user-org" placeholder="Enter your organisation">
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Executive Summary</h2>
+        <p>This application facilitates analysis of cyber threats using the MITRE ATT&CK Framework as a kill chain model. It guides security teams through documenting adversary tactics and techniques across 14 tactics: Reconnaissance, Resource Development, Initial Access, Execution, Persistence, Privilege Escalation, Defense Evasion, Credential Access, Discovery, Lateral Movement, Collection, Command and Control, Exfiltration, and Impact. A dynamic table records observations, mitigations, and notes, with dropdowns for all MITRE ATT&CK tactics and techniques. A diagram visualizes the kill chain, dynamically updated with entries, and an Action Log tracks activities.</p>
+    </div>
+
+    <div class="section" id="kill-chain-diagram">
+        <h2>Kill Chain Diagram</h2>
+        <svg id="kill-chain-svg" width="900" height="400" viewBox="0 0 900 400" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+
+    <div class="section" id="kill-chain-table-section">
+        <h2>Kill Chain Analysis Form</h2>
+        <div class="input-group">
+            <label for="tactic">Tactic:</label>
+            <select id="tactic">
+                <option value="Reconnaissance">Reconnaissance</option>
+                <option value="Resource Development">Resource Development</option>
+                <option value="Initial Access">Initial Access</option>
+                <option value="Execution">Execution</option>
+                <option value="Persistence">Persistence</option>
+                <option value="Privilege Escalation">Privilege Escalation</option>
+                <option value="Defense Evasion">Defense Evasion</option>
+                <option value="Credential Access">Credential Access</option>
+                <option value="Discovery">Discovery</option>
+                <option value="Lateral Movement">Lateral Movement</option>
+                <option value="Collection">Collection</option>
+                <option value="Command and Control">Command and Control</option>
+                <option value="Exfiltration">Exfiltration</option>
+                <option value="Impact">Impact</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label for="technique">Technique:</label>
+            <select id="technique">
+                <!-- Populated dynamically based on tactic -->
+            </select>
+        </div>
+        <div class="input-group">
+            <label for="activity">Observed Activity:</label>
+            <textarea id="activity" placeholder="e.g., Suspicious emails targeting executives"></textarea>
+        </div>
+        <div class="input-group">
+            <label for="mitigation">Mitigation:</label>
+            <textarea id="mitigation" placeholder="e.g., Deploy email filtering, conduct training"></textarea>
+        </div>
+        <div class="input-group">
+            <label for="notes">Notes:</label>
+            <textarea id="notes" placeholder="e.g., Review logs for further evidence"></textarea>
+        </div>
+        <div class="button-container">
+            <button id="add-entry">Add Entry to Table</button>
+        </div>
+
+        <h3>Kill Chain Table</h3>
+        <table id="kill-chain-table">
+            <thead>
+                <tr>
+                    <th>Tactic</th>
+                    <th>Technique</th>
+                    <th>Observed Activity</th>
+                    <th>Mitigation</th>
+                    <th>Notes</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+    <div id="log-section">
+        <h2>Action Log</h2>
+        <div class="input-group">
+            <label for="timeline-alt-name">Alternative Name:</label>
+            <input type="text" id="timeline-alt-name" placeholder="Enter alternative name (optional)">
+        </div>
+        <div class="input-group">
+            <label for="timeline-activity">Timeline Entry:</label>
+            <textarea id="timeline-activity" placeholder="Enter activity description"></textarea>
+            <button id="add-timeline" style="margin-left: 10px;">Add Timeline Entry</button>
+        </div>
+        <p id="timeline-error">Please enter a name (either in User Information or Alternative Name) to add a timeline entry.</p>
+        <div id="log-list"></div>
+        <div class="button-container">
+            <button id="export-log">Export Log</button>
+            <button id="clear-state-button">Clear State</button>
+        </div>
+    </div>
+
+    <div class="footer">
+        <p>© Xservus Limited</p>
+    </div>
+
+    <script>
+        // MITRE ATT&CK tactics and techniques data (all Enterprise techniques)
+        const mitreAttackData = {
+            "Reconnaissance": [
+                { id: "T1598.002", name: "Phishing for Information: Spearphishing Attachment" },
+                { id: "T1598.003", name: "Phishing for Information: Spearphishing Link" },
+                { id: "T1598.001", name: "Phishing for Information: Spearphishing Service" },
+                { id: "T1591", name: "Gather Victim Org Information" },
+                { id: "T1591.001", name: "Gather Victim Org Information: Determine Physical Locations" },
+                { id: "T1591.002", name: "Gather Victim Org Information: Business Relationships" },
+                { id: "T1589", name: "Gather Victim Identity Information" },
+                { id: "T1589.001", name: "Gather Victim Identity Information: Credentials" },
+                { id: "T1589.002", name: "Gather Victim Identity Information: Email Addresses" },
+                { id: "T1590", name: "Gather Victim Network Information" },
+                { id: "T1590.001", name: "Gather Victim Network Information: Domain Properties" },
+                { id: "T1590.002", name: "Gather Victim Network Information: DNS" },
+                { id: "T1590.003", name: "Gather Victim Network Information: Network Trust Dependencies" }
+            ],
+            "Resource Development": [
+                { id: "T1583.001", name: "Acquire Infrastructure: Domains" },
+                { id: "T1583.002", name: "Acquire Infrastructure: DNS Server" },
+                { id: "T1583.003", name: "Acquire Infrastructure: Virtual Private Server" },
+                { id: "T1583.004", name: "Acquire Infrastructure: Server" },
+                { id: "T1583.005", name: "Acquire Infrastructure: Botnet" },
+                { id: "T1583.006", name: "Acquire Infrastructure: Web Services" },
+                { id: "T1584.001", name: "Compromise Infrastructure: Domains" },
+                { id: "T1584.002", name: "Compromise Infrastructure: DNS Server" },
+                { id: "T1584.003", name: "Compromise Infrastructure: Virtual Private Server" },
+                { id: "T1584.004", name: "Compromise Infrastructure: Server" },
+                { id: "T1586.001", name: "Compromise Accounts: Social Media Accounts" },
+                { id: "T1586.002", name: "Compromise Accounts: Email Accounts" },
+                { id: "T1608", name: "Stage Capabilities" },
+                { id: "T1608.001", name: "Stage Capabilities: Upload Malware" },
+                { id: "T1608.002", name: "Stage Capabilities: Upload Tool" },
+                { id: "T1608.003", name: "Stage Capabilities: Install Digital Certificate" }
+            ],
+            "Initial Access": [
+                { id: "T1566.001", name: "Phishing: Spearphishing Attachment" },
+                { id: "T1566.002", name: "Phishing: Spearphishing Link" },
+                { id: "T1566.003", name: "Phishing: Spearphishing via Service" },
+                { id: "T1190", name: "Exploit Public-Facing Application" },
+                { id: "T1133", name: "External Remote Services" },
+                { id: "T1078", name: "Valid Accounts" },
+                { id: "T1078.001", name: "Valid Accounts: Default Accounts" },
+                { id: "T1078.002", name: "Valid Accounts: Domain Accounts" },
+                { id: "T1078.003", name: "Valid Accounts: Local Accounts" },
+                { id: "T1078.004", name: "Valid Accounts: Cloud Accounts" },
+                { id: "T1199", name: "Trusted Relationship" },
+                { id: "T1189", name: "Drive-by Compromise" }
+            ],
+            "Execution": [
+                { id: "T1059.001", name: "Command and Scripting Interpreter: PowerShell" },
+                { id: "T1059.002", name: "Command and Scripting Interpreter: AppleScript" },
+                { id: "T1059.003", name: "Command and Scripting Interpreter: Windows Command Shell" },
+                { id: "T1059.004", name: "Command and Scripting Interpreter: Unix Shell" },
+                { id: "T1059.005", name: "Command and Scripting Interpreter: Visual Basic" },
+                { id: "T1059.006", name: "Command and Scripting Interpreter: Python" },
+                { id: "T1059.007", name: "Command and Scripting Interpreter: JavaScript" },
+                { id: "T1204.001", name: "User Execution: Malicious Link" },
+                { id: "T1204.002", name: "User Execution: Malicious File" },
+                { id: "T1053.002", name: "Scheduled Task/Job: At" },
+                { id: "T1053.005", name: "Scheduled Task/Job: Scheduled Task" },
+                { id: "T1129", name: "Shared Modules" },
+                { id: "T1106", name: "Native API" }
+            ],
+            "Persistence": [
+                { id: "T1547.001", name: "Boot or Logon Autostart Execution: Registry Run Keys" },
+                { id: "T1547.002", name: "Boot or Logon Autostart Execution: Authentication Package" },
+                { id: "T1547.003", name: "Boot or Logon Autostart Execution: Time Providers" },
+                { id: "T1136.001", name: "Create Account: Local Account" },
+                { id: "T1136.002", name: "Create Account: Domain Account" },
+                { id: "T1053.005", name: "Scheduled Task/Job: Scheduled Task" },
+                { id: "T1078", name: "Valid Accounts" },
+                { id: "T1546.001", name: "Event Triggered Execution: Change Default File Association" },
+                { id: "T1546.002", name: "Event Triggered Execution: Screensaver" },
+                { id: "T1546.003", name: "Event Triggered Execution: Windows Management Instrumentation Event Subscription" },
+                { id: "T1098", name: "Account Manipulation" }
+            ],
+            "Privilege Escalation": [
+                { id: "T1068", name: "Exploitation for Privilege Escalation" },
+                { id: "T1548.001", name: "Access Token Manipulation: Token Impersonation/Theft" },
+                { id: "T1548.002", name: "Access Token Manipulation" },
+                { id: "T1134", name: "Access Token Manipulation" },
+                { id: "T1547.001", name: "Boot or Logon Autostart Execution: Registry Run Keys" },
+                { id: "T1055", name: "Process Injection" },
+                { id: "T1053.005", name: "Scheduled Task/Job: Scheduled Task" },
+                { id: "T1078", name: "Valid Accounts" },
+                { id: "T1543.003", name: "Create or Modify System Process: Windows Service" }
+            ],
+            "Defense Evasion": [
+                { id: "T1562.001", name: "Impair Defenses: Disable or Modify Tools" },
+                { id: "T1562.002", name: "Impair Defenses: Disable Windows Event Logging" },
+                { id: "T1027", name: "Obfuscated Files or Information" },
+                { id: "T1027.001", name: "Obfuscated Files or Information: Binary Padding" },
+                { id: "T1070.001", name: "Indicator Removal: Clear Windows Event Logs" },
+                { id: "T1070.004", name: "Indicator Removal: File Deletion" },
+                { id: "T1055", name: "Process Injection" },
+                { id: "T1036", name: "Masquerading" },
+                { id: "T1036.001", name: "Masquerading: Invalid Code Signature" },
+                { id: "T1564.001", name: "Hide Artifacts: Hidden Files and Directories" },
+                { id: "T1078", name: "Valid Accounts" }
+            ],
+            "Credential Access": [
+                { id: "T1003.001", name: "OS Credential Dumping: LSASS Memory" },
+                { id: "T1003.002", name: "OS Credential Dumping: Security Account Manager" },
+                { id: "T1110.001", name: "Brute Force: Password Guessing" },
+                { id: "T1110.002", name: "Brute Force: Password Cracking" },
+                { id: "T1555", name: "Credentials from Password Stores" },
+                { id: "T1555.003", name: "Credentials from Password Stores: Credentials from Web Browsers" },
+                { id: "T1552.001", name: "Unsecured Credentials: Credentials In Files" },
+                { id: "T1558", name: "Steal or Forge Kerberos Tickets" },
+                { id: "T1558.001", name: "Steal or Forge Kerberos Tickets: Golden Ticket" }
+            ],
+            "Discovery": [
+                { id: "T1087.001", name: "Account Discovery: Local Account" },
+                { id: "T1087.002", name: "Account Discovery: Domain Account" },
+                { id: "T1046", name: "Network Service Discovery" },
+                { id: "T1018", name: "Remote System Discovery" },
+                { id: "T1082", name: "System Information Discovery" },
+                { id: "T1083", name: "File and Directory Discovery" },
+                { id: "T1057", name: "Process Discovery" },
+                { id: "T1016", name: "System Network Configuration Discovery" },
+                { id: "T1049", name: "System Network Connections Discovery" },
+                { id: "T1069", name: "Permission Groups Discovery" }
+            ],
+            "Lateral Movement": [
+                { id: "T1021.001", name: "Remote Services: Remote Desktop Protocol" },
+                { id: "T1021.002", name: "Remote Services: SMB/Windows Admin Shares" },
+                { id: "T1078", name: "Valid Accounts" },
+                { id: "T1570", name: "Lateral Tool Transfer" },
+                { id: "T1550.002", name: "Use Alternate Authentication Material: Pass the Hash" },
+                { id: "T1563.002", name: "Remote Service Session Hijacking: RDP Hijacking" }
+            ],
+            "Collection": [
+                { id: "T1005", name: "Data from Local System" },
+                { id: "T1119", name: "Automated Collection" },
+                { id: "T1213", name: "Data from Information Repositories" },
+                { id: "T1213.002", name: "Data from Information Repositories: SharePoint" },
+                { id: "T1114.001", name: "Email Collection: Local Email" },
+                { id: "T1113", name: "Screen Capture" },
+                { id: "T1125", name: "Video Capture" }
+            ],
+            "Command and Control": [
+                { id: "T1071.001", name: "Application Layer Protocol: Web Protocols" },
+                { id: "T1071.002", name: "Application Layer Protocol: FTP" },
+                { id: "T1573.001", name: "Encrypted Channel: Symmetric Cryptography" },
+                { id: "T1573.002", name: "Encrypted Channel: Asymmetric Cryptography" },
+                { id: "T1105", name: "Ingress Tool Transfer" },
+                { id: "T1571", name: "Non-Standard Port" },
+                { id: "T1102.002", name: "Web Service: Bidirectional Communication" }
+            ],
+            "Exfiltration": [
+                { id: "T1041", name: "Exfiltration Over C2 Channel" },
+                { id: "T1020", name: "Automated Exfiltration" },
+                { id: "T1567.001", name: "Exfiltration Over Web Service: Exfiltration to Code Repository" },
+                { id: "T1567.002", name: "Exfiltration Over Web Service: Exfiltration to Cloud Storage" },
+                { id: "T1048.003", name: "Exfiltration Over Alternative Protocol: Exfiltration Over Unencrypted Non-C2 Protocol" }
+            ],
+            "Impact": [
+                { id: "T1486", name: "Data Encrypted for Impact" },
+                { id: "T1499", name: "Endpoint Denial of Service" },
+                { id: "T1499.001", name: "Endpoint Denial of Service: OS Exhaustion Flood" },
+                { id: "T1491", name: "Defacement" },
+                { id: "T1491.001", name: "Defacement: Internal Defacement" },
+                { id: "T1485", name: "Data Destruction" },
+                { id: "T1498", name: "Network Denial of Service" },
+                { id: "T1496", name: "Resource Hijacking" }
+            ]
+        };
+
+        // Initialize log and entries arrays
+        let logEntries = [];
+        let killChainEntries = [];
+
+        // Load data from local storage
+        function loadData() {
+            const savedLog = localStorage.getItem('killChainLog');
+            if (savedLog) {
+                logEntries = JSON.parse(savedLog);
+                updateLogDisplay();
+            }
+            const savedEntries = localStorage.getItem('killChainEntries');
+            if (savedEntries) {
+                killChainEntries = JSON.parse(savedEntries);
+                updateKillChainTable();
+                updateKillChainDiagram();
+            }
+            loadUserInfo();
+        }
+
+        // Load user info from local storage
+        function loadUserInfo() {
+            document.getElementById('user-name').value = localStorage.getItem('killChainUserName') || '';
+            document.getElementById('user-title').value = localStorage.getItem('killChainUserTitle') || '';
+            document.getElementById('user-role').value = localStorage.getItem('killChainUserRole') || '';
+            document.getElementById('user-org').value = localStorage.getItem('killChainUserOrg') || '';
+            document.getElementById('timeline-alt-name').value = localStorage.getItem('killChainTimelineAltName') || '';
+        }
+
+        // Save user info to local storage
+        function saveUserInfo() {
+            localStorage.setItem('killChainUserName', document.getElementById('user-name').value);
+            localStorage.setItem('killChainUserTitle', document.getElementById('user-title').value);
+            localStorage.setItem('killChainUserRole', document.getElementById('user-role').value);
+            localStorage.setItem('killChainUserOrg', document.getElementById('user-org').value);
+            localStorage.setItem('killChainTimelineAltName', document.getElementById('timeline-alt-name').value);
+        }
+
+        // Get user info for log entry
+        function getUserInfo() {
+            return {
+                name: document.getElementById('user-name').value || 'Unknown',
+                title: document.getElementById('user-title').value || 'N/A',
+                role: document.getElementById('user-role').value || 'N/A',
+                org: document.getElementById('user-org').value || 'N/A'
+            };
+        }
+
+        // Update technique dropdown based on selected tactic
+        function updateTechniqueDropdown(tactic) {
+            const techniqueSelect = document.getElementById('technique');
+            techniqueSelect.innerHTML = '<option value="">Select Technique</option>';
+            const techniques = mitreAttackData[tactic] || [];
+            techniques.forEach(tech => {
+                const option = document.createElement('option');
+                option.value = `${tech.id}: ${tech.name}`;
+                option.textContent = `${tech.id}: ${tech.name}`;
+                techniqueSelect.appendChild(option);
+            });
+        }
+
+        // Update kill chain diagram
+        function updateKillChainDiagram() {
+            const svg = document.getElementById('kill-chain-svg');
+            svg.innerHTML = `
+                <defs>
+                    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+                        <path d="M0,0 L0,6 L9,3 z" fill="#333" />
+                    </marker>
+                </defs>
+            `;
+
+            const tactics = [
+                "Reconnaissance", "Resource Development", "Initial Access", "Execution", "Persistence",
+                "Privilege Escalation", "Defense Evasion", "Credential Access", "Discovery", "Lateral Movement",
+                "Collection", "Command and Control", "Exfiltration", "Impact"
+            ];
+            const boxWidth = 60;
+            const boxHeight = 30;
+            const spacing = 60;
+            const startX = 10;
+            const startY = 30;
+
+            // Group entries by tactic
+            const entriesByTactic = {};
+            tactics.forEach(tactic => entriesByTactic[tactic] = []);
+            killChainEntries.forEach(entry => {
+                entriesByTactic[entry.tactic].push(entry);
+            });
+
+            tactics.forEach((tactic, index) => {
+                const x = startX + index * (boxWidth + spacing);
+                const y = startY;
+
+                // Draw tactic box
+                svg.innerHTML += `
+                    <rect x="${x}" y="${y}" width="${boxWidth}" height="${boxHeight}" fill="#3498db" stroke="#333" />
+                    <text x="${x + boxWidth / 2}" y="${y + boxHeight / 2 + 5}" font-size="10" fill="white" text-anchor="middle">${tactic.slice(0, 6)}</text>
+                `;
+
+                // Draw entries (up to 3)
+                const entries = entriesByTactic[tactic].slice(-3); // Last 3 entries
+                entries.forEach((entry, i) => {
+                    const textY = y + boxHeight + 15 + i * 15;
+                    const techniqueShort = entry.technique.split(': ')[1].slice(0, 15);
+                    const activityShort = (entry.activity || '').slice(0, 15);
+                    svg.innerHTML += `
+                        <text x="${x + boxWidth / 2}" y="${textY}" font-size="8" fill="#333" text-anchor="middle">${techniqueShort}</text>
+                        <text x="${x + boxWidth / 2}" y="${textY + 10}" font-size="8" fill="#333" text-anchor="middle">${activityShort}</text>
+                    `;
+                });
+
+                // Add note if more entries exist
+                if (entriesByTactic[tactic].length > 3) {
+                    const textY = y + boxHeight + 15 + 3 * 15;
+                    svg.innerHTML += `
+                        <text x="${x + boxWidth / 2}" y="${textY}" font-size="8" fill="#333" text-anchor="middle">...more in table</text>
+                    `;
+                }
+
+                // Draw arrow to next tactic
+                if (index < tactics.length - 1) {
+                    svg.innerHTML += `
+                        <path d="M${x + boxWidth},${y + boxHeight / 2} L${x + boxWidth + spacing},${y + boxHeight / 2}" stroke="#333" marker-end="url(#arrow)" />
+                    `;
+                }
+            });
+        }
+
+        // Update kill chain table
+        function updateKillChainTable() {
+            const tbody = document.querySelector('#kill-chain-table tbody');
+            tbody.innerHTML = '';
+            killChainEntries.forEach((entry, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${entry.tactic}</td>
+                    <td>${entry.technique || ''}</td>
+                    <td>${entry.activity || ''}</td>
+                    <td>${entry.mitigation || ''}</td>
+                    <td>${entry.notes || ''}</td>
+                    <td><button class="delete-button" data-index="${index}">Delete</button></td>
+                `;
+                tbody.appendChild(row);
+            });
+            localStorage.setItem('killChainEntries', JSON.stringify(killChainEntries));
+
+            // Attach delete event listeners
+            document.querySelectorAll('.delete-button').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const index = parseInt(e.target.dataset.index);
+                    const deletedTactic = killChainEntries[index].tactic;
+                    killChainEntries.splice(index, 1);
+                    updateKillChainTable();
+                    updateKillChainDiagram();
+
+                    // Log the deletion
+                    const timestamp = new Date().toLocaleString();
+                    const { name, title, role, org } = getUserInfo();
+                    const entry = `[${timestamp}] ${name} (${title}, ${role}, ${org}) - Deleted kill chain entry for tactic: ${deletedTactic}`;
+                    logEntries.push(entry);
+                    updateLogDisplay();
+                });
+            });
+        }
+
+        // Add kill chain entry
+        document.getElementById('add-entry').addEventListener('click', () => {
+            const entry = {
+                tactic: document.getElementById('tactic').value,
+                technique: document.getElementById('technique').value,
+                activity: document.getElementById('activity').value,
+                mitigation: document.getElementById('mitigation').value,
+                notes: document.getElementById('notes').value
+            };
+            killChainEntries.push(entry);
+            updateKillChainTable();
+            updateKillChainDiagram();
+
+            // Log the action
+            const timestamp = new Date().toLocaleString();
+            const { name, title, role, org } = getUserInfo();
+            const logEntry = `[${timestamp}] ${name} (${title}, ${role}, ${org}) - Added kill chain entry for tactic: ${entry.tactic}`;
+            logEntries.push(logEntry);
+            updateLogDisplay();
+
+            // Clear form
+            document.getElementById('tactic').value = 'Reconnaissance';
+            updateTechniqueDropdown('Reconnaissance');
+            document.getElementById('activity').value = '';
+            document.getElementById('mitigation').value = '';
+            document.getElementById('notes').value = '';
+        });
+
+        // Add timeline log entry
+        function addTimelineLogEntry() {
+            const nameInput = document.getElementById('user-name');
+            const altNameInput = document.getElementById('timeline-alt-name');
+            const activityInput = document.getElementById('timeline-activity');
+            const errorDisplay = document.getElementById('timeline-error');
+
+            if (!nameInput.value.trim() && !altNameInput.value.trim()) {
+                errorDisplay.style.display = 'block';
+                return false;
+            }
+
+            errorDisplay.style.display = 'none';
+            const timestamp = new Date().toLocaleString();
+            const { title, role, org } = getUserInfo();
+            const name = altNameInput.value.trim() || nameInput.value.trim() || 'Unknown';
+            const activity = activityInput.value.trim() || 'No description provided';
+            const entry = `[${timestamp}] ${name} (${title}, ${role}, ${org}) - Timeline Entry: ${activity}`;
+            logEntries.push(entry);
+            updateLogDisplay();
+            activityInput.value = '';
+            altNameInput.value = '';
+            saveUserInfo();
+            return true;
+        }
+
+        // Update log display
+        function updateLogDisplay() {
+            const logList = document.getElementById('log-list');
+            logList.innerHTML = logEntries.map(entry => `<p>${entry}</p>`).join('');
+            logList.scrollTop = logList.scrollHeight;
+            localStorage.setItem('killChainLog', JSON.stringify(logEntries));
+        }
+
+        // Export log as text file
+        function exportLog() {
+            const { name, title, role, org } = getUserInfo();
+            const header = `Kill Chain Analysis Log\nUser: ${name}\nTitle: ${title}\nRole: ${role}\nOrganisation: ${org}\nGenerated: ${new Date().toLocaleString()}\n\n`;
+            const footer = `\nCreated using the PwnDefend Kill Chain Analysis App - copyright (c) xservus limited`;
+            const content = header + logEntries.join('\n') + footer;
+            const blob = new Blob([content], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `Kill_Chain_Log_${new Date().toISOString().replace(/[:.]/g, '-')}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Clear state
+        function clearState() {
+            killChainEntries = [];
+            logEntries = [];
+            updateKillChainTable();
+            updateKillChainDiagram();
+            document.getElementById('user-name').value = '';
+            document.getElementById('user-title').value = '';
+            document.getElementById('user-role').value = '';
+            document.getElementById('user-org').value = '';
+            document.getElementById('timeline-alt-name').value = '';
+            document.getElementById('timeline-activity').value = '';
+            localStorage.removeItem('killChainUserName');
+            localStorage.removeItem('killChainUserTitle');
+            localStorage.removeItem('killChainUserRole');
+            localStorage.removeItem('killChainUserOrg');
+            localStorage.removeItem('killChainTimelineAltName');
+            localStorage.removeItem('killChainLog');
+            localStorage.removeItem('killChainEntries');
+            document.getElementById('timeline-error').style.display = 'none';
+        }
+
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            loadData();
+
+            // Initialize technique dropdown
+            updateTechniqueDropdown('Reconnaissance');
+
+            // Tactic change listener to update techniques
+            document.getElementById('tactic').addEventListener('change', (e) => {
+                updateTechniqueDropdown(e.target.value);
+            });
+
+            // User info input listeners
+            ['user-name', 'user-title', 'user-role', 'user-org', 'timeline-alt-name'].forEach(id => {
+                document.getElementById(id).addEventListener('input', saveUserInfo);
+            });
+
+            // Timeline entry button
+            document.getElementById('add-timeline').addEventListener('click', () => {
+                if (addTimelineLogEntry()) {
+                    localStorage.setItem('killChainLog', JSON.stringify(logEntries));
+                }
+            });
+
+            // Export log button
+            document.getElementById('export-log').addEventListener('click', exportLog);
+
+            // Clear state button
+            document.getElementById('clear-state-button').addEventListener('click', clearState);
+
+            // Jump to Action Log button
+            document.getElementById('jump-to-log').addEventListener('click', () => {
+                document.getElementById('log-section').scrollIntoView({ behavior: 'smooth' });
+            });
+
+            // Copy to Clipboard button for email template
+            const copyButton = document.getElementById('copy-email-template');
+            if (copyButton) {
+                copyButton.addEventListener('click', () => {
+                    const queryText = document.getElementById('email-template').textContent;
+                    navigator.clipboard.writeText(queryText).then(() => {
+                        copyButton.textContent = 'Copied!';
+                        copyButton.classList.add('copied');
+                        setTimeout(() => {
+                            copyButton.textContent = 'Copy to Clipboard';
+                            copyButton.classList.remove('copied');
+                        }, 2000);
+                    });
+                });
+            }
+        });
+    </script>
+</body>
+</html>

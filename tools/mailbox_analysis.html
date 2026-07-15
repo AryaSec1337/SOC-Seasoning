@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SOC Analyst: Investigating a Compromised Mailbox</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        h1, h2, h3 {
+            color: #1a73e8;
+            margin-bottom: 15px;
+        }
+
+        h1 {
+            font-size: 2.5em;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            border-bottom: 2px solid #1a73e8;
+            padding-bottom: 5px;
+        }
+
+        h3 {
+            font-size: 1.4em;
+        }
+
+        p, ul, ol {
+            margin-bottom: 15px;
+        }
+
+        ul, ol {
+            padding-left: 20px;
+        }
+
+        li {
+            margin-bottom: 10px;
+        }
+
+        .section {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+
+        .highlight {
+            background-color: #e8f0fe;
+            padding: 10px;
+            border-left: 4px solid #1a73e8;
+            margin-bottom: 15px;
+        }
+
+        .log-section {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .log-input {
+            width: 100%;
+            max-width: 600px;
+            margin-bottom: 20px;
+        }
+
+        .log-input select {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            font-size: 1em;
+        }
+
+        .log-input textarea {
+            width: 100%;
+            height: 100px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-bottom: 10px;
+            resize: vertical;
+            font-size: 1em;
+        }
+
+        .log-input button {
+            background: #1a73e8;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .log-input button:hover {
+            background: #1557b0;
+        }
+
+        .log-display {
+            width: 100%;
+            max-width: 600px;
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            border-radius: 5px;
+            background: #fafafa;
+            margin-bottom: 20px;
+        }
+
+        .log-entry {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-left: 3px solid #1a73e8;
+            background: #fff;
+            border-radius: 3px;
+            position: relative;
+        }
+
+        .log-entry p {
+            margin: 0;
+            font-size: 0.95em;
+        }
+
+        .log-entry .timestamp {
+            font-size: 0.85em;
+            color: #666;
+        }
+
+        .log-entry .edit-button {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #1a73e8;
+            color: #fff;
+            border: none;
+            padding: 5px 10px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
+        .log-entry .edit-button:hover {
+            background: #1557b0;
+        }
+
+        .edit-form {
+            display: none;
+            margin-top: 10px;
+        }
+
+        .edit-form select, .edit-form textarea {
+            width: 100%;
+            margin-bottom: 10px;
+        }
+
+        .edit-form button {
+            background: #1a73e8;
+            color: #fff;
+            padding: 5px 10px;
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+        }
+
+        .edit-form button:hover {
+            background: #1557b0;
+        }
+
+        .export-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .export-buttons button, .clear-button {
+            background: #1a73e8;
+            color: #fff;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1em;
+        }
+
+        .export-buttons button:hover, .clear-button:hover {
+            background: #1557b0;
+        }
+
+        .back-to-top {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: #1a73e8;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 0.9em;
+            display: none;
+        }
+
+        .back-to-top:hover {
+            background: #1557b0;
+        }
+
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            h2 {
+                font-size: 1.5em;
+            }
+
+            h3 {
+                font-size: 1.2em;
+            }
+
+            .section, .log-section {
+                padding: 15px;
+            }
+
+            .log-input, .log-display {
+                max-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>SOC Analyst: Investigating a Compromised Mailbox</h1>
+    <p class="highlight">As a Security Operations Center (SOC) analyst, my role is to monitor, detect, and respond to security incidents in real time. Investigating a report of a compromised mailbox requires a swift, systematic approach to validate the alert, contain the threat, mitigate damage, and document findings for escalation or reporting. Below is a detailed explanation of my process, rationale, and tools used to investigate and resolve the incident.</p>
+
+    <div class="section">
+        <h2>Why Investigate?</h2>
+        <p>A compromised mailbox is a critical security incident that can lead to:</p>
+        <ul>
+            <li><strong>Data Exfiltration</strong>: Attackers may steal sensitive data, such as customer information or proprietary documents.</li>
+            <li><strong>Phishing Campaigns</strong>: Compromised accounts can be used to send phishing emails, targeting internal or external recipients.</li>
+            <li><strong>Account Takeover</strong>: Attackers may escalate access to other systems or accounts within the organization.</li>
+            <li><strong>Business Disruption</strong>: Malicious activity can disrupt operations or lead to financial loss.</li>
+            <li><strong>Regulatory Non-Compliance</strong>: Breaches may violate standards like GDPR, PCI-DSS, or SOX, resulting in penalties.</li>
+        </ul>
+        <p>As a SOC analyst, my priority is to quickly validate and contain the incident to limit impact, preserve evidence, and support the organization’s security posture.</p>
+    </div>
+
+    <div class="section">
+        <h2>Incident Response Process</h2>
+        <p>My investigation follows the SOC’s incident response framework, aligned with NIST 800-61, and includes detection, analysis, containment, eradication, recovery, and post-incident activities.</p>
+
+        <h3>1. Detection and Triage</h3>
+        <p><strong>Objective</strong>: Confirm the alert and prioritize the incident.</p>
+        <ul>
+            <li><strong>Review Alert</strong>: Analyze the SIEM alert or user report (e.g., suspicious email or login) in tools like Splunk or Microsoft Sentinel.</li>
+            <li><strong>Validate Incident</strong>: Check for indicators like unusual login locations or unauthorized email activity.</li>
+            <li><strong>Assign Priority</strong>: Use the SOC’s severity matrix to prioritize based on impact and scope.</li>
+            <li><strong>Log Incident</strong>: Create a ticket in the SOC’s case management system (e.g., ServiceNow, Jira).</li>
+        </ul>
+        <p><strong>Why</strong>: Ensures the incident is legitimate and prioritized appropriately for rapid response.</p>
+
+        <h3>2. Initial Analysis</h3>
+        <p><strong>Objective</strong>: Determine the scope and nature of the compromise.</p>
+        <ul>
+            <li><strong>Check Login Activity</strong>: Review authentication logs for unfamiliar IPs, devices, or geolocations using Microsoft 365 audit logs or SIEM dashboards.</li>
+            <li><strong>Analyze Suspicious Emails</strong>: Inspect email headers, attachments, and URLs in a sandbox (e.g., Any.Run, JoeSandbox).</li>
+            <li><strong>Interview Reporter</strong>: If user-reported, gather details via secure communication channels.</li>
+            <li><strong>Correlate Events</strong>: Cross-reference with other alerts (e.g., failed logins, DLP triggers) to identify patterns.</li>
+        </ul>
+        <p><strong>Why</strong>: Confirms the compromise and identifies immediate risks to guide containment.</p>
+
+        <h3>3. Detailed Investigation</h3>
+        <p><strong>Objective</strong>: Identify the root cause, attack vector, and full scope.</p>
+        <ul>
+            <li><strong>Log Analysis</strong>:
+                <ul>
+                    <li>Query email server logs for sent/deleted emails or forwarding rules.</li>
+                    <li>Check Active Directory logs for credential misuse or privilege escalation.</li>
+                    <li>Use SIEM tools to aggregate and correlate logs.</li>
+                </ul>
+            </li>
+            <li><strong>Threat Intelligence</strong>: Compare indicators of compromise (IOCs) like IP addresses or domains with feeds (e.g., VirusTotal, AlienVault OTX).</li>
+            <li><strong>Credential Compromise</strong>:
+                <ul>
+                    <li>Verify if credentials were leaked (e.g., HaveIBeenPwned).</li>
+                    <li>Check for phishing emails or malware infections via EDR tools (e.g., CrowdStrike, Carbon Black).</li>
+                </ul>
+            </li>
+            <li><strong>Lateral Movement</strong>: Investigate access to other systems (e.g., SharePoint, VPN) using network traffic analysis.</li>
+        </ul>
+        <p><strong>Why</strong>: Provides a comprehensive understanding of the incident to inform containment and remediation.</p>
+
+        <h3>4. Containment</h3>
+        <p><strong>Objective</strong>: Stop the threat and limit further damage.</p>
+        <ul>
+            <li><strong>Short-Term Actions</strong>:
+                <ul>
+                    <li>Lock or suspend the compromised account.</li>
+                    <li>Revoke active sessions and reset passwords.</li>
+                    <li>Quarantine malicious emails using email security tools (e.g., Proofpoint, Mimecast).</li>
+                </ul>
+            </li>
+            <li><strong>Long-Term Actions</strong>:
+                <ul>
+                    <li>Block malicious IPs or domains via firewall rules.</li>
+                    <li>Notify recipients of phishing emails to prevent further interaction.</li>
+                </ul>
+            </li>
+        </ul>
+        <p><strong>Why</strong>: Halts the attack while preserving evidence for further analysis.</p>
+
+        <h3>5. Eradication and Recovery</h3>
+        <p><strong>Objective</strong>: Remove the threat and restore normal operations.</p>
+        <ul>
+            <li><strong>Eradicate</strong>: Remove malware, delete unauthorized rules, and clear compromised sessions.</li>
+            <li><strong>Strengthen Security</strong>: Enforce MFA, update email filtering policies, and patch vulnerabilities.</li>
+            <li><strong>Restore Access</strong>: Re-enable the account after verifying security controls.</li>
+            <li><strong>Monitor</strong>: Set up SIEM alerts for similar activity to detect recurrence.</li>
+        </ul>
+        <p><strong>Why</strong>: Ensures the threat is fully eliminated and systems are secure before resuming operations.</p>
+
+        <h3>6. Post-Incident Activities</h3>
+        <p><strong>Objective</strong>: Document, report, and improve SOC processes.</p>
+        <ul>
+            <li><strong>Document Findings</strong>: Update the incident ticket with a timeline, root cause, and actions taken.</li>
+            <li><strong>Escalate if Needed</strong>: Notify incident response leads or management for high-severity incidents.</li>
+            <li><strong>External Reporting</strong>: Inform regulators or affected parties if required (e.g., data breach notifications).</li>
+            <li><strong>Lessons Learned</strong>: Conduct a debrief to identify process gaps and update playbooks.</li>
+        </ul>
+        <p><strong>Why</strong>: Enhances SOC readiness and ensures compliance with organizational and regulatory requirements.</p>
+    </div>
+
+    <div class="section">
+        <h2>Tools and Processes</h2>
+        <p>As a SOC analyst, I rely on a suite of tools and standardized processes to investigate efficiently:</p>
+        <ul>
+            <li><strong>Tools</strong>:
+                <ul>
+                    <li><strong>SIEM</strong>: Splunk, Microsoft Sentinel, QRadar for log aggregation and alerting.</li>
+                    <li><strong>Email Security</strong>: Microsoft 365 Defender, Proofpoint, Mimecast for email analysis and quarantine.</li>
+                    <li><strong>EDR</strong>: CrowdStrike, Carbon Black for endpoint threat detection.</li>
+                    <li><strong>Threat Intelligence</strong>: VirusTotal, AlienVault OTX for IOC enrichment.</li>
+                    <li><strong>Sandbox</strong>: Any.Run, JoeSandbox for malware analysis.</li>
+                    <li><strong>Case Management</strong>: ServiceNow, Jira for incident tracking.</li>
+                </ul>
+            </li>
+            <li><strong>Processes</strong>:
+                <ul>
+                    <li>Follow SOC runbooks for mailbox compromise incidents.</li>
+                    <li>Adhere to chain-of-custody for evidence handling.</li>
+                    <li>Escalate incidents per the SOC’s escalation matrix.</li>
+                    <li>Align with NIST 800-61 and organizational incident response policies.</li>
+                </ul>
+            </li>
+            <li><strong>Collaboration</strong>:
+                <ul>
+                    <li>Coordinate with IT for account management and system access.</li>
+                    <li>Work with the incident response team for complex investigations.</li>
+                    <li>Engage legal/compliance teams for regulatory reporting.</li>
+                </ul>
+            </li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Additional Considerations</h2>
+        <ul>
+            <li><strong>Real-Time Monitoring</strong>: Continuously monitor SIEM and EDR alerts during the investigation.</li>
+            <li><strong>Shift Handoff</strong>: Document all actions clearly for the next SOC shift to ensure continuity.</li>
+            <li><strong>Communication</strong>: Use concise, actionable updates when reporting to stakeholders.</li>
+            <li><strong>Compliance</strong>: Ensure all actions comply with data protection and privacy regulations.</li>
+        </ul>
+    </div>
+
+    <div class="section">
+        <h2>Summary</h2>
+        <p>As a SOC analyst responding to a compromised mailbox alert, I would:</p>
+        <ol>
+            <li>Triage the alert, validate the incident, and create a ticket.</li>
+            <li>Analyze login activity, emails, and correlated events to assess scope.</li>
+            <li>Investigate logs, IOCs, and potential lateral movement to identify the root cause.</li>
+            <li>Contain the incident by locking the account and quarantining emails.</li>
+            <li>Eradicate threats, restore secure access, and implement monitoring.</li>
+            <li>Document findings, escalate if needed, and conduct a lessons-learned review.</li>
+        </ol>
+        <p>This process ensures rapid response, minimizes impact, and strengthens the organization’s security posture.</p>
+    </div>
+
+    <div class="log-section">
+        <h2>Investigation Log</h2>
+        <div class="log-input">
+            <select id="logType">
+                <option value="Action">Action</option>
+                <option value="Note">Note</option>
+            </select>
+            <textarea id="logContent" placeholder="Enter action or note (e.g., 'Checked login logs in Splunk', 'Noted phishing email with malicious URL')..."></textarea>
+            <button onclick="addLogEntry()">Add Entry</button>
+        </div>
+        <div class="log-display" id="logDisplay"></div>
+        <div class="export-buttons">
+            <button onclick="exportToPNG()">Export to PNG</button>
+            <button onclick="exportToPDF()">Export to PDF</button>
+            <button onclick="exportToJSON()">Export to JSON</button>
+            <button class="clear-button" onclick="clearLog()">Clear Log</button>
+        </div>
+    </div>
+
+    <a href="#" class="back-to-top" onclick="window.scrollTo(0,0); return false;">Back to Top</a>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        const { jsPDF } = window.jspdf;
+        let logEntries = JSON.parse(localStorage.getItem('logEntries')) || [];
+
+        function saveToLocalStorage() {
+            localStorage.setItem('logEntries', JSON.stringify(logEntries));
+        }
+
+        function addLogEntry() {
+            const logType = document.getElementById('logType').value;
+            const logContent = document.getElementById('logContent').value.trim();
+            if (!logContent) return;
+
+            const timestamp = new Date().toLocaleString();
+            const entry = { id: Date.now(), type: logType, content: logContent, timestamp };
+            logEntries.push(entry);
+            saveToLocalStorage();
+            displayLogEntries();
+            document.getElementById('logContent').value = '';
+        }
+
+        function editLogEntry(id) {
+            const entryElement = document.getElementById(`entry-${id}`);
+            const form = entryElement.querySelector('.edit-form');
+            form.style.display = form.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function saveEdit(id) {
+            const entryElement = document.getElementById(`entry-${id}`);
+            const newType = entryElement.querySelector('.edit-type').value;
+            const newContent = entryElement.querySelector('.edit-content').value.trim();
+            if (!newContent) return;
+
+            const index = logEntries.findIndex(entry => entry.id === id);
+            if (index !== -1) {
+                logEntries[index].type = newType;
+                logEntries[index].content = newContent;
+                logEntries[index].timestamp = new Date().toLocaleString();
+                saveToLocalStorage();
+                displayLogEntries();
+            }
+        }
+
+        function displayLogEntries() {
+            const logDisplay = document.getElementById('logDisplay');
+            logDisplay.innerHTML = logEntries.map(entry => `
+                <div class="log-entry" id="entry-${entry.id}">
+                    <p><strong>${entry.type}</strong>: ${entry.content}</p>
+                    <p class="timestamp">${entry.timestamp}</p>
+                    <button class="edit-button" onclick="editLogEntry(${entry.id})">Edit</button>
+                    <div class="edit-form">
+                        <select class="edit-type">
+                            <option value="Action" ${entry.type === 'Action' ? 'selected' : ''}>Action</option>
+                            <option value="Note" ${entry.type === 'Note' ? 'selected' : ''}>Note</option>
+                        </select>
+                        <textarea class="edit-content">${entry.content}</textarea>
+                        <button onclick="saveEdit(${entry.id})">Save</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function exportToPNG() {
+            const logDisplay = document.getElementById('logDisplay');
+            html2canvas(logDisplay).then(canvas => {
+                const link = document.createElement('a');
+                link.download = 'investigation_log.png';
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+            });
+        }
+
+        function exportToPDF() {
+            const logDisplay = document.getElementById('logDisplay');
+            html2canvas(logDisplay).then(canvas => {
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF();
+                const imgProps = pdf.getImageProperties(imgData);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                pdf.save('investigation_log.pdf');
+            });
+        }
+
+        function exportToJSON() {
+            const dataStr = JSON.stringify(logEntries, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const link = document.createElement('a');
+            link.download = 'investigation_log.json';
+            link.href = URL.createObjectURL(blob);
+            link.click();
+        }
+
+        function clearLog() {
+            if (confirm('Are you sure you want to clear the log? This action cannot be undone.')) {
+                logEntries = [];
+                localStorage.removeItem('logEntries');
+                displayLogEntries();
+            }
+        }
+
+        window.onscroll = function() {
+            let backToTop = document.querySelector('.back-to-top');
+            if (document.body.scrollTop > 100 || document.documentElement.scrollTop > 100) {
+                backToTop.style.display = 'block';
+            } else {
+                backToTop.style.display = 'none';
+            }
+        };
+
+        // Load existing log entries on page load
+        displayLogEntries();
+    </script>
+</body>
+</html>
